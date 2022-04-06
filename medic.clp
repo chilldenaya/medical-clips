@@ -26,13 +26,19 @@
 	(printout t "Checkup " ?currentDate " (" ?curretDoctor "): "  (send ?currentStep get-Result) crlf)
 	(while TRUE do
 		(bind ?nextLabCheck (send ?currentStep get-NextLabCheck))
-		(bind ?nextCheckUp (send ?currentStep get-NextCheckUp))
 		(if (neq ?nextLabCheck [nil]) then
 				(bind ?labDate (send ?nextLabCheck get-Date))
 				(bind ?labExaminer (send ?nextLabCheck get-ExaminerName))
 				(printout t "Labcheck " ?labDate " (" ?labExaminer "): "  (send ?nextLabCheck get-Result) crlf)
 		)
-		(if (eq ?nextCheckUp [nil]) then (break))
+		(bind ?nextCheckUp (send ?currentStep get-NextCheckUp))
+		(if (neq ?nextCheckUp [nil]) then
+				(bind ?currentStep ?nextCheckUp)
+				(bind ?currentDate (send ?currentStep get-Date))
+				(bind ?curretDoctor (send ?currentStep get-DoctorName))
+				(printout t "Checkup " ?currentDate " (" ?curretDoctor "): "  (send ?currentStep get-Result) crlf)
+		)
+		(if (eq (send ?currentStep get-NextCheckUp) [nil]) then (break))
 	)
 )
 
@@ -70,6 +76,7 @@
 	(slot Doctor (type INSTANCE) (allowed-classes DOCTOR))
 	(message-handler put-NextCheckUp after)
 	(message-handler put-NextLabCheck after)
+	(message-handler put-prevCheckUp after)
 	(message-handler get-DoctorName)
 )
 
@@ -83,6 +90,15 @@
 	;; to make a linked list
 	(if (eq (send ?value get-PrevCheckUp) [nil])
 		then (send ?value put-PrevCheckUp ?self)
+	)
+)
+
+(defmessage-handler CHECKUP put-PrevCheckUp after (?value)
+	;; if in a current CHECKUP, a prevCheckUp is defined
+	;; define the prevCheckUp.NextCheckUp as the current CHECKUP
+	;; to make a linked list
+	(if (eq (send ?value get-NextCheckUp) [nil])
+		then (send ?value put-NextCheckUp ?self)
 	)
 )
 
@@ -120,6 +136,15 @@
 		(Date "22Jan2021")
 		(Doctor [doctor1])
 		(NextLabCheck [labCheck1])
+	)
+	(checkUp2 of CHECKUP 
+		(Result "gejala darah sudah normal")
+		(Cost 150)
+		(Date "28Jan2021")
+		(Doctor [doctor1])
+		(PrevCheckUp [checkUp1])
+		(PrevLabCheck [labCheck1])
+		(NextLabCheck [labCheck2])
 	)
 	(medHistory1 of MEDICALHISTORY 
 		(FirstCheckUp [checkUp1])
