@@ -1,6 +1,6 @@
 (defclass PERSON
     (is-a USER)
-	(slot Name (type STRING))
+	(slot Name (type STRING) (visibility public))
 	(slot DateOfBirth (type STRING))
 	(slot Sex (allowed-values male female))
 )
@@ -15,6 +15,25 @@
 	(is-a PERSON)
 	(slot PatientID (type STRING))
 	(slot BloodType (type STRING))
+	(slot MedicalHistory (type INSTANCE) (allowed-classes MEDICALHISTORY))
+	(message-handler get-MedicalHistoryList)
+)
+
+(defmessage-handler PATIENT get-MedicalHistoryList ()
+	(bind ?currentStep (send ?self:MedicalHistory get-FirstCheckUp))
+	(bind ?currentDate (send ?currentStep get-Date))
+	(bind ?curretDoctor (send ?currentStep get-DoctorName))
+	(printout t "Checkup " ?currentDate " (" ?curretDoctor "): "  (send ?currentStep get-Result) crlf)
+	(while TRUE do
+		(bind ?nextLabCheck (send ?currentStep get-NextLabCheck))
+		(bind ?nextCheckUp (send ?currentStep get-NextCheckUp))
+		(if (neq ?nextLabCheck [nil]) then
+				(bind ?labDate (send ?nextLabCheck get-Date))
+				(bind ?labExaminer (send ?nextLabCheck get-ExaminerName))
+				(printout t "Labcheck " ?labDate " (" ?labExaminer "): "  (send ?nextLabCheck get-Result) crlf)
+		)
+		(if (eq ?nextCheckUp [nil]) then (break))
+	)
 )
 
 (defclass EXAMINER
@@ -24,9 +43,9 @@
 
 (defclass CHECKPART
     (is-a USER)
-	(slot Patient (type INSTANCE) (allowed-classes PATIENT))
-	(slot Date (type STRING))
+	(slot Date (type STRING) (visibility public))
 	(slot Cost (type INTEGER))
+	(message-handler get-Patient)
 )
 
 (defclass LABCHECK
@@ -34,18 +53,37 @@
 	(slot Examiner (type INSTANCE) (allowed-classes EXAMINER))
 	(slot Type (type STRING))
 	(slot Result (type STRING))
+	(message-handler get-ExaminerName)
+)
+
+(defmessage-handler LABCHECK get-ExaminerName ()
+	(send ?self:Examiner get-Name)
 )
 
 (defclass CHECKUP
     (is-a CHECKPART)
-	(slot PrevLabCheck (type INSTANCE) (allowed-classes LABCHECK))
-	(slot PrevCheckUp (type INSTANCE) (allowed-classes CHECKUP))
-	(slot NextLabCheck (type INSTANCE) (allowed-classes LABCHECK))
-	(slot NextCheckUp (type INSTANCE) (allowed-classes CHECKUP))
+	(slot PrevLabCheck (type INSTANCE) (allowed-classes LABCHECK) (visibility public) (create-accessor read-write))
+	(slot PrevCheckUp (type INSTANCE) (allowed-classes CHECKUP) (visibility public) (create-accessor read-write))
+	(slot NextLabCheck (type INSTANCE) (allowed-classes LABCHECK) (visibility public) (create-accessor read-write))
+	(slot NextCheckUp (type INSTANCE) (allowed-classes CHECKUP) (visibility public) (create-accessor read-write))
 	(slot Result (type STRING))
 	(slot Doctor (type INSTANCE) (allowed-classes DOCTOR))
 	(message-handler put-NextCheckUp after)
 	(message-handler put-NextLabCheck after)
+	(message-handler get-DoctorName)
+)
+
+(defmessage-handler CHECKUP get-DoctorName ()
+	(send ?self:Doctor get-Name)
+)
+
+(defmessage-handler CHECKUP put-NextCheckUp after (?value)
+	;; if in a current CHECKUP, a NextCheckUp is defined
+	;; define the NextCheckUp.PrevCheckUp as the current CHECKUP
+	;; to make a linked list
+	(if (eq (send ?value get-PrevCheckUp) [nil])
+		then (send ?value put-PrevCheckUp ?self)
+	)
 )
 
 (defclass MEDICALHISTORY
@@ -53,6 +91,7 @@
 	(slot FirstCheckUp (type INSTANCE) (allowed-classes CHECKUP))
 	(message-handler get-TotalCost)
 	(message-handler get-BeginDate)
+	(message-handler get-Patient)
 )
 
 (definstances examples
@@ -63,27 +102,34 @@
 		(EmployeeID "1000288938102")
 		(LicenseID "0008982719200512")
 	)
+	(examiner1 of EXAMINER
+		(Name "examiner1")
+		(DateOfBirth "22Dec86")
+		(Sex "male")
+		(EmployeeID "1000288938102")
+	)
+	(labCheck1 of LABCHECK 
+		(Date "25Jan2021")
+		(Type "gula darah")
+		(Result "tinggi")
+		(Examiner [examiner1])
+	)
+	(checkUp1 of CHECKUP 
+		(Result "gejala darah tinggi")
+		(Cost 100)
+		(Date "22Jan2021")
+		(Doctor [doctor1])
+		(NextLabCheck [labCheck1])
+	)
+	(medHistory1 of MEDICALHISTORY 
+		(FirstCheckUp [checkUp1])
+	)
 	(patient1 of PATIENT
 		(Name "pasien1")
 		(DateOfBirth "22Dec86")
 		(Sex "male")
 		(PatientID "000028134")
 		(BloodType "O")
-	)
-	(examiner1 of EXAMINER
-		(Name "dokter1")
-		(DateOfBirth "22Dec86")
-		(Sex "male")
-		(EmployeeID "1000288938102")
-	)
-	(checkUp1 of CHECKUP 
-		(Result "darah tinggi")
-		(Cost 100)
-		(Date "22Jan2021")
-		(Patient [patient1])
-		(Doctor [doctor1])
-	)
-	(medHistory1 of MEDICALHISTORY 
-		(FirstCheckUp [travelStep18a])
+		(MedicalHistory [medHistory1])
 	)
 )
