@@ -16,8 +16,17 @@
 	(slot PatientID (type STRING))
 	(slot BloodType (type STRING))
 	(slot MedicalHistory (type INSTANCE) (allowed-classes MEDICALHISTORY))
+	(message-handler get-BeginTreatmentDate)
 	(message-handler get-MedicalHistoryList)
+	(message-handler get-TotalCost)
 )
+
+(defmessage-handler PATIENT get-BeginTreatmentDate ()
+	(bind ?firstCheckUp (send ?self:MedicalHistory get-FirstCheckUp))
+	(bind ?firstCheckDate (send ?firstCheckUp get-Date))
+	(printout t "First checkup date: " ?firstCheckDate crlf)
+)
+
 
 (defmessage-handler PATIENT get-MedicalHistoryList ()
 	(bind ?currentStep (send ?self:MedicalHistory get-FirstCheckUp))
@@ -40,6 +49,26 @@
 		)
 		(if (eq (send ?currentStep get-NextCheckUp) [nil]) then (break))
 	)
+)
+
+(defmessage-handler PATIENT get-TotalCost ()
+	(bind ?currentStep (send ?self:MedicalHistory get-FirstCheckUp))
+	(bind ?totalCost (send ?currentStep get-Cost))
+	(while TRUE do
+		(bind ?nextLabCheck (send ?currentStep get-NextLabCheck))
+		(if (neq ?nextLabCheck [nil]) then
+				(bind ?currentLabCost (send ?nextLabCheck get-Cost))
+				(bind ?totalCost (+ ?totalCost ?currentLabCost))
+		)
+		(bind ?nextCheckUp (send ?currentStep get-NextCheckUp))
+		(if (neq ?nextCheckUp [nil]) then
+				(bind ?currentStep ?nextCheckUp)
+				(bind ?currentCheckUpCost (send ?nextCheckUp get-Cost))
+				(bind ?totalCost (+ ?totalCost ?currentCheckUpCost))
+		)
+		(if (eq (send ?currentStep get-NextCheckUp) [nil]) then (break))
+	)
+	(printout t "Total Cost: " ?totalCost crlf)
 )
 
 (defclass EXAMINER
@@ -105,8 +134,6 @@
 (defclass MEDICALHISTORY
     (is-a USER)
 	(slot FirstCheckUp (type INSTANCE) (allowed-classes CHECKUP))
-	(message-handler get-TotalCost)
-	(message-handler get-BeginDate)
 	(message-handler get-Patient)
 )
 
@@ -126,6 +153,7 @@
 	)
 	(labCheck1 of LABCHECK 
 		(Date "25Jan2021")
+		(Cost 200)
 		(Type "gula darah")
 		(Result "tinggi")
 		(Examiner [examiner1])
